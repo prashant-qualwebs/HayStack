@@ -2,14 +2,15 @@ from fastapi import APIRouter, UploadFile, File, Form
 from app.schemas.ingestion import IngestResponse
 from app.services.ingestion_service import ingest_file
 from app.core.exceptions import ValidationError, ProcessingError
+from app.core.config import settings
 
 router = APIRouter()
 
 
 @router.post("/ingest", response_model=IngestResponse)
-async def ingest_documents(file: UploadFile = File(...), user_id: str = Form("default_user")):
+async def ingest_documents(file: UploadFile = File(...), user_id: str = Form(settings.DEFAULT_USER_ID)):
     if not user_id or not user_id.strip():
-        user_id = "default_user"
+        user_id = settings.DEFAULT_USER_ID
     
     if not file:
         raise ValidationError("No file provided")

@@ -1,5 +1,9 @@
 from haystack.components.rankers import TransformersSimilarityRanker
+from app.core.config import settings
 
 
-def get_ranker(top_k: int = 5, model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"):
-    return TransformersSimilarityRanker(model=model, top_k=top_k)
+def get_ranker(top_k: int = None, model: str = None):
+    return TransformersSimilarityRanker(
+        model=model or settings.RANKER_MODEL,
+        top_k=top_k or settings.RERANK_TOP_K
+    )

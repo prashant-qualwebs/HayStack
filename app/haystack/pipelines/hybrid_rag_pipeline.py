@@ -26,7 +26,10 @@ Answer:
 """
 
 
-def create_hybrid_rag_pipeline(top_k: int = 5, retrieval_top_k: int = 20):
+def create_hybrid_rag_pipeline(top_k: int = None, retrieval_top_k: int = None):
+    top_k = top_k or settings.RERANK_TOP_K
+    retrieval_top_k = retrieval_top_k or settings.RETRIEVAL_TOP_K
+    
     pipeline = Pipeline()
     
     text_embedder = SentenceTransformersTextEmbedder(model=settings.EMBEDDING_MODEL)
@@ -44,7 +47,7 @@ def create_hybrid_rag_pipeline(top_k: int = 5, retrieval_top_k: int = 20):
     pipeline.add_component("llm", OpenAIGenerator(
         api_key=Secret.from_token(settings.OPENAI_API_KEY),
         model=settings.OPENAI_MODEL,
-        generation_kwargs={"temperature": 0.2, "max_tokens": 2000}
+        generation_kwargs={"temperature": settings.OPENAI_TEMPERATURE, "max_tokens": settings.OPENAI_MAX_TOKENS}
     ))
     
     pipeline.connect("text_embedder.embedding", "dense_retriever.query_embedding")
@@ -57,5 +60,5 @@ def create_hybrid_rag_pipeline(top_k: int = 5, retrieval_top_k: int = 20):
     return pipeline
 
 
-def get_hybrid_rag_pipeline(top_k: int = 5, retrieval_top_k: int = 20):
+def get_hybrid_rag_pipeline(top_k: int = None, retrieval_top_k: int = None):
     return create_hybrid_rag_pipeline(top_k=top_k, retrieval_top_k=retrieval_top_k)

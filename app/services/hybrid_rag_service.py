@@ -2,7 +2,7 @@ from typing import Dict
 from app.haystack.pipelines.hybrid_rag_pipeline import get_hybrid_rag_pipeline
 
 
-def retrieve_and_generate_hybrid(query: str, user_id: str, top_k: int = 5, retrieval_top_k: int = 20) -> Dict:
+def retrieve_and_generate_hybrid(query: str, user_id: str, top_k: int = None, retrieval_top_k: int = None) -> Dict:
     user_filter = {"field": "user_id", "operator": "==", "value": user_id}
     hybrid_pipeline = get_hybrid_rag_pipeline(top_k=top_k, retrieval_top_k=retrieval_top_k)
     

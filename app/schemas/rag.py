@@ -1,12 +1,13 @@
 from pydantic import BaseModel
 from typing import List, Dict, Optional
+from app.core.config import settings
 
 
 class QueryRequest(BaseModel):
     query: str
-    user_id: str = "default_user"
-    top_k: int = 5
-    retrieval_top_k: int = 20
+    user_id: str = settings.DEFAULT_USER_ID
+    top_k: int = settings.RERANK_TOP_K
+    retrieval_top_k: int = settings.RETRIEVAL_TOP_K
 
 
 class RetrievedDocument(BaseModel):
