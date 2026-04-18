@@ -1,47 +1,54 @@
+from haystack import Document
 from haystack.components.converters import PyPDFToDocument, DOCXToDocument
-from app.haystack.pipelines.indexing_pipeline import indexing_pipeline
+from typing import List
+from fastapi import UploadFile
 import tempfile
 import os
+from app.haystack.pipelines.indexing_pipeline import indexing_pipeline
 
 
-async def ingest_file(content: bytes, filename: str, user_id: str) -> int:
-    file_ext = filename.lower().split('.')[-1]
+async def ingest_files(files: List[UploadFile], user_id: str, document_id: str) -> int:
+    documents = []
     
-    if file_ext == 'pdf':
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp_file:
+    for file in files:
+        # Save uploaded file temporarily
+        with tempfile.NamedTemporaryFile(delete=False, suffix=f".{file.filename.split('.')[-1]}") as tmp_file:
+            content = await file.read()
             tmp_file.write(content)
-            tmp_path = tmp_file.name
+            tmp_file_path = tmp_file.name
         
         try:
-            converter = PyPDFToDocument()
-            result = converter.run(sources=[tmp_path])
-            docs = result["documents"]
+            # Convert file to Haystack documents based on type
+            file_ext = file.filename.lower().split(".")[-1]
             
-            for doc in docs:
-                doc.meta["source"] = filename
-                doc.meta["file_type"] = "pdf"
-                doc.meta["user_id"] = user_id
-        finally:
-            os.unlink(tmp_path)
+            if file_ext == "pdf":
+                converter = PyPDFToDocument()
+                result = converter.run(sources=[tmp_file_path])
+                converted_docs = result["documents"]
+            elif file_ext in ["docx", "doc"]:
+                converter = DOCXToDocument()
+                result = converter.run(sources=[tmp_file_path])
+                converted_docs = result["documents"]
+            else:
+                continue
             
-    elif file_ext == 'docx':
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.docx', mode='wb') as tmp_file:
-            tmp_file.write(content)
-            tmp_path = tmp_file.name
+            # Add metadata to each document
+            for doc in converted_docs:
+                doc.meta.update({
+                    "user_id": user_id,
+                    "document_id": document_id,
+                    "filename": file.filename,
+                    "source": "api"
+                })
+                documents.append(doc)
         
-        try:
-            converter = DOCXToDocument()
-            result = converter.run(sources=[tmp_path])
-            docs = result["documents"]
-            
-            for doc in docs:
-                doc.meta["source"] = filename
-                doc.meta["file_type"] = "docx"
-                doc.meta["user_id"] = user_id
         finally:
-            os.unlink(tmp_path)
-    else:
-        raise ValueError(f"Unsupported file type: {file_ext}")
+            # Clean up temporary file
+            if os.path.exists(tmp_file_path):
+                os.unlink(tmp_file_path)
     
-    result = indexing_pipeline.run({"splitter": {"documents": docs}})
+    if not documents:
+        return 0
+    
+    result = indexing_pipeline.run({"splitter": {"documents": documents}})
     return result["writer"]["documents_written"]

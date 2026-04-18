@@ -1,26 +1,38 @@
-from fastapi import APIRouter, UploadFile, File, Form
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form
+from typing import List
 from app.schemas.ingestion import IngestResponse
-from app.services.ingestion_service import ingest_file
-from app.core.exceptions import ValidationError, ProcessingError
-from app.core.config import settings
+from app.services.ingestion_service import ingest_files
 
 router = APIRouter()
 
 
 @router.post("/ingest", response_model=IngestResponse)
-async def ingest_documents(file: UploadFile = File(...), user_id: str = Form(settings.DEFAULT_USER_ID)):
-    if not user_id or not user_id.strip():
-        user_id = settings.DEFAULT_USER_ID
-    
-    if not file:
-        raise ValidationError("No file provided")
-    
-    if not file.filename.lower().endswith(('.pdf', '.docx')):
-        raise ValidationError("Only PDF and DOCX files are allowed")
-    
+async def ingest_documents(
+    files: List[UploadFile] = File(...),
+    user_id: str = Form(...),
+    document_id: str = Form(...)
+):
     try:
-        content = await file.read()
-        count = await ingest_file(content, file.filename, user_id)
-        return IngestResponse(message=f"File '{file.filename}' ingested successfully", documents_count=count, user_id=user_id)
+        if not files:
+            raise HTTPException(status_code=400, detail="No files provided")
+        
+        # Validate file types
+        allowed_extensions = {".pdf", ".docx", ".doc"}
+        for file in files:
+            file_ext = file.filename.lower().split(".")[-1]
+            if f".{file_ext}" not in allowed_extensions:
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"File type .{file_ext} not supported. Only PDF and DOCX files are allowed."
+                )
+        
+        count = await ingest_files(files, user_id, document_id)
+        
+        return IngestResponse(
+            message="Documents ingested successfully",
+            documents_count=count
+        )
+    except HTTPException:
+        raise
     except Exception as e:
-        raise ProcessingError(f"Ingestion failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Ingestion failed: {str(e)}")

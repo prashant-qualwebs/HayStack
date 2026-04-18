@@ -5,9 +5,8 @@ from app.core.config import settings
 
 class QueryRequest(BaseModel):
     query: str
-    user_id: str = settings.DEFAULT_USER_ID
-    top_k: int = settings.RERANK_TOP_K
-    retrieval_top_k: int = settings.RETRIEVAL_TOP_K
+    user_id: str
+    top_k: int = settings.DEFAULT_QUERY_TOP_K
 
 
 class RetrievedDocument(BaseModel):
@@ -18,5 +17,4 @@ class RetrievedDocument(BaseModel):
 
 class QueryResponse(BaseModel):
     query: str
-    answer: str
     retrieved_documents: List[RetrievedDocument]

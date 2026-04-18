@@ -2,9 +2,9 @@ from haystack.components.preprocessors import DocumentSplitter
 from app.core.config import settings
 
 
-def get_document_splitter(split_by: str = None, split_length: int = None, split_overlap: int = None):
+def get_document_splitter():
     return DocumentSplitter(
-        split_by=split_by or settings.SPLITTER_SPLIT_BY,
-        split_length=split_length or settings.SPLITTER_SPLIT_LENGTH,
-        split_overlap=split_overlap or settings.SPLITTER_SPLIT_OVERLAP
+        split_by=settings.SPLIT_BY, 
+        split_length=settings.CHUNK_SIZE, 
+        split_overlap=settings.CHUNK_OVERLAP
     )

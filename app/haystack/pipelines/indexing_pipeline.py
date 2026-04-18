@@ -9,7 +9,7 @@ def create_indexing_pipeline():
     pipeline = Pipeline()
     pipeline.add_component("splitter", get_document_splitter())
     pipeline.add_component("embedder", document_embedder)
-    pipeline.add_component("writer", DocumentWriter(document_store=document_store, policy="upsert"))
+    pipeline.add_component("writer", DocumentWriter(document_store=document_store))
     pipeline.connect("splitter.documents", "embedder.documents")
     pipeline.connect("embedder.documents", "writer.documents")
     return pipeline
