@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List, Dict, Optional
+from typing import List
 from app.core.config import settings
 
 
@@ -11,8 +11,7 @@ class QueryRequest(BaseModel):
 
 class RetrievedDocument(BaseModel):
     content: str
-    score: Optional[float] = None
-    metadata: Dict = {}
+    score: float | None = None
 
 
 class QueryResponse(BaseModel):

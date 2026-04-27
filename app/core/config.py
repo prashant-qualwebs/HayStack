@@ -9,6 +9,8 @@ class Settings(BaseSettings):
     # Elasticsearch Settings
     ELASTICSEARCH_HOST: str = "http://localhost:9200"
     ELASTICSEARCH_INDEX: str = "documents"
+    ELASTICSEARCH_USERNAME: str | None = None
+    ELASTICSEARCH_PASSWORD: str | None = None
     
     # Embedding Model Settings
     EMBEDDING_MODEL: str = "sentence-transformers/all-MiniLM-L6-v2"
