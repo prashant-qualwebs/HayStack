@@ -1,17 +1,17 @@
+from typing import Any, Dict, List
+
 from pydantic import BaseModel
-from typing import List
-from app.core.config import settings
 
 
 class QueryRequest(BaseModel):
     query: str
-    user_id: str
-    top_k: int = settings.DEFAULT_QUERY_TOP_K
+    document_id: str | None = None
 
 
 class RetrievedDocument(BaseModel):
     content: str
     score: float | None = None
+    metadata: Dict[str, Any]
 
 
 class QueryResponse(BaseModel):

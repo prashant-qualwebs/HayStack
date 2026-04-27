@@ -1,36 +1,35 @@
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from typing import List
-from app.schemas.ingestion import IngestResponse
-from app.services.ingestion_service import ingest_files
+
+from fastapi import APIRouter, HTTPException
+
+from app.schemas.ingestion import IngestChunk, IngestResponse
+from app.services.ingestion_service import ingest_chunks
 
 router = APIRouter()
 
 
 @router.post("/ingest", response_model=IngestResponse)
-async def ingest_documents(
-    files: List[UploadFile] = File(...),
-    user_id: str = Form(...),
-    document_id: str = Form(...)
-):
+async def ingest_documents(chunks: List[IngestChunk]):
     try:
-        if not files:
-            raise HTTPException(status_code=400, detail="No files provided")
-        
-        # Validate file types
-        allowed_extensions = {".pdf", ".docx", ".doc"}
-        for file in files:
-            file_ext = file.filename.lower().split(".")[-1]
-            if f".{file_ext}" not in allowed_extensions:
-                raise HTTPException(
-                    status_code=400, 
-                    detail=f"File type .{file_ext} not supported. Only PDF and DOCX files are allowed."
-                )
-        
-        count = await ingest_files(files, user_id, document_id)
-        
+        if not chunks:
+            raise HTTPException(status_code=400, detail="No chunks provided")
+
+        empty_chunks = [
+            chunk.chunk_index
+            for chunk in chunks
+            if not chunk.text or not chunk.text.strip()
+        ]
+        if empty_chunks:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Chunk text cannot be empty. Empty chunk_index values: {empty_chunks}",
+            )
+
+        count = ingest_chunks(chunks)
+
         return IngestResponse(
-            message="Documents ingested successfully",
-            documents_count=count
+            message="Chunks ingested successfully",
+            documents_count=count,
         )
     except HTTPException:
         raise
