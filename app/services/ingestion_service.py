@@ -51,10 +51,14 @@ def _create_window_documents(chunks: List[IngestChunk]) -> List[Document]:
     for document_id, document_chunks in chunks_by_document_id.items():
         sorted_chunks = sorted(document_chunks, key=lambda chunk: chunk.chunk_index)
 
-        for position, chunk in enumerate(sorted_chunks):
-            start = max(0, position - window)
-            end = min(len(sorted_chunks), position + window + 1)
-            window_chunks = sorted_chunks[start:end]
+        for chunk in sorted_chunks:
+            start_index = chunk.chunk_index - window
+            end_index = chunk.chunk_index + window
+            window_chunks = [
+                source_chunk
+                for source_chunk in sorted_chunks
+                if start_index <= source_chunk.chunk_index <= end_index
+            ]
 
             documents.append(
                 Document(
