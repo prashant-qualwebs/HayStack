@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     BM25_RETRIEVER_TOP_K: int = 10
     RANKER_TOP_K: int = 5
     DEFAULT_QUERY_TOP_K: int = 5
+    INDEXING_CONTEXT_WINDOW: int = 1
+    MIN_RETRIEVAL_SCORE: float = 0.1
+    SOURCE_CHUNK_SCORE_THRESHOLD: float = 0.5
     
     # Document Splitting Settings
     SPLIT_BY: str = "word"

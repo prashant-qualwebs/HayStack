@@ -3,7 +3,6 @@ from typing import Dict, List
 from haystack import Document
 
 from app.core.config import settings
-from app.haystack.document_store.elastic import document_store
 from app.haystack.pipelines.hybrid_rag_pipeline import hybrid_rag_pipeline
 
 
@@ -21,13 +20,106 @@ def _format_response(query: str, documents: List[Document]) -> Dict:
     }
 
 
-def _documents_for_document_id(document_id: str) -> List[Document]:
-    documents = document_store.filter_documents()
-    return [
-        document
-        for document in documents
-        if document.meta.get("document_id") == document_id
+def _document_id_filter(document_id: str) -> Dict:
+    return {
+        "field": "meta.document_id",
+        "operator": "==",
+        "value": document_id,
+    }
+
+
+def _passes_min_score(document: Document) -> bool:
+    return document.score is None or document.score >= settings.MIN_RETRIEVAL_SCORE
+
+
+def _source_chunk_key(source_chunk: Dict) -> tuple:
+    metadata = source_chunk.get("metadata", {})
+    return (
+        metadata.get("document_id"),
+        metadata.get("chunk_id"),
+        metadata.get("chunk_index"),
+    )
+
+
+def _rank_source_chunks(query: str, document: Document) -> Document | None:
+    source_chunks = document.meta.get("source_chunks")
+    if not source_chunks:
+        return document
+
+    source_documents = [
+        Document(
+            content=source_chunk.get("content", ""),
+            meta=source_chunk.get("metadata", {}),
+        )
+        for source_chunk in source_chunks
+        if source_chunk.get("content")
     ]
+    if not source_documents:
+        return None
+
+    ranker = hybrid_rag_pipeline.get_component("ranker")
+    result = ranker.run(
+        query=query,
+        documents=source_documents,
+        top_k=len(source_documents),
+    )
+
+    ranked_source_documents = [
+        source_document
+        for source_document in result["documents"]
+        if source_document.score is not None
+        and source_document.score >= settings.SOURCE_CHUNK_SCORE_THRESHOLD
+    ]
+    if not ranked_source_documents:
+        return None
+
+    ranked_source_documents = sorted(
+        ranked_source_documents,
+        key=lambda source_document: source_document.meta.get("chunk_index", 0),
+    )
+
+    return Document(
+        content="\n\n".join(
+            source_document.content
+            for source_document in ranked_source_documents
+            if source_document.content
+        ),
+        score=document.score,
+        meta={
+            **document.meta,
+            "source_chunks": [
+                {
+                    "content": source_document.content,
+                    "score": source_document.score,
+                    "metadata": source_document.meta,
+                }
+                for source_document in ranked_source_documents
+            ],
+        },
+    )
+
+
+def _filter_and_dedupe_documents(query: str, documents: List[Document]) -> List[Document]:
+    filtered_documents = []
+    seen_source_chunks = set()
+
+    for document in documents:
+        if not _passes_min_score(document):
+            continue
+
+        filtered_document = _rank_source_chunks(query, document)
+        if filtered_document is None:
+            continue
+
+        source_chunks = filtered_document.meta.get("source_chunks", [])
+        source_keys = tuple(_source_chunk_key(source_chunk) for source_chunk in source_chunks)
+        if source_keys and source_keys in seen_source_chunks:
+            continue
+
+        seen_source_chunks.add(source_keys)
+        filtered_documents.append(filtered_document)
+
+    return filtered_documents
 
 
 def retrieve_and_generate(
@@ -36,22 +128,22 @@ def retrieve_and_generate(
 ) -> Dict:
     top_k = _top_k()
     document_id = document_id.strip() if document_id else None
-
-    if document_id:
-        documents = _documents_for_document_id(document_id)
-        if not documents:
-            return _format_response(query, [])
-
-        ranker = hybrid_rag_pipeline.get_component("ranker")
-        result = ranker.run(query=query, documents=documents, top_k=top_k)
-        return _format_response(query, result["documents"])
+    filters = _document_id_filter(document_id) if document_id else None
 
     pipeline_input = {
         "text_embedder": {"text": query},
-        "bm25_retriever": {"query": query, "top_k": top_k},
-        "dense_retriever": {"top_k": top_k},
+        "bm25_retriever": {
+            "query": query,
+            "top_k": settings.BM25_RETRIEVER_TOP_K,
+            "filters": filters,
+        },
+        "dense_retriever": {
+            "top_k": settings.DENSE_RETRIEVER_TOP_K,
+            "filters": filters,
+        },
         "ranker": {"query": query, "top_k": top_k},
     }
 
     result = hybrid_rag_pipeline.run(pipeline_input)
-    return _format_response(query, result["ranker"]["documents"])
+    documents = _filter_and_dedupe_documents(query, result["ranker"]["documents"])
+    return _format_response(query, documents)
