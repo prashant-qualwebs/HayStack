@@ -20,12 +20,24 @@ def _format_response(query: str, documents: List[Document]) -> Dict:
     }
 
 
-def _document_id_filter(document_id: str) -> Dict:
+def _metadata_filter(field: str, value: str) -> Dict:
     return {
-        "field": "meta.document_id",
+        "field": f"meta.{field}",
         "operator": "==",
-        "value": document_id,
+        "value": value,
     }
+
+
+def _retrieval_filters(document_id: str | None, user_id: str) -> Dict:
+    conditions = []
+    if document_id:
+        conditions.append(_metadata_filter("document_id", document_id))
+    conditions.append(_metadata_filter("user_id", user_id))
+
+    if len(conditions) == 1:
+        return conditions[0]
+
+    return {"operator": "AND", "conditions": conditions}
 
 
 def _passes_min_score(document: Document) -> bool:
@@ -36,8 +48,9 @@ def _source_chunk_key(source_chunk: Dict) -> tuple:
     metadata = source_chunk.get("metadata", {})
     return (
         metadata.get("document_id"),
-        metadata.get("chunk_id"),
-        metadata.get("chunk_index"),
+        metadata.get("user_id"),
+        metadata.get("tag"),
+        metadata.get("order"),
     )
 
 
@@ -75,7 +88,7 @@ def _rank_source_chunks(query: str, document: Document) -> Document | None:
 
     ranked_source_documents = sorted(
         ranked_source_documents,
-        key=lambda source_document: source_document.meta.get("chunk_index", 0),
+        key=lambda source_document: source_document.meta.get("order", 0),
     )
 
     return Document(
@@ -124,11 +137,13 @@ def _filter_and_dedupe_documents(query: str, documents: List[Document]) -> List[
 
 def retrieve_and_generate(
     query: str,
+    user_id: str,
     document_id: str | None = None,
 ) -> Dict:
     top_k = _top_k()
     document_id = document_id.strip() if document_id else None
-    filters = _document_id_filter(document_id) if document_id else None
+    user_id = user_id.strip()
+    filters = _retrieval_filters(document_id, user_id)
 
     pipeline_input = {
         "text_embedder": {"text": query},

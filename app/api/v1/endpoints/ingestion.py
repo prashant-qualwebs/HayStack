@@ -14,18 +14,18 @@ async def ingest_documents(chunks: List[IngestChunk]):
         if not chunks:
             raise HTTPException(status_code=400, detail="No chunks provided")
 
-        empty_chunks = [
-            chunk.chunk_index
+        ingestible_chunks = [
+            chunk
             for chunk in chunks
-            if not chunk.text or not chunk.text.strip()
+            if chunk.text and chunk.text.strip()
         ]
-        if empty_chunks:
+        if not ingestible_chunks:
             raise HTTPException(
                 status_code=400,
-                detail=f"Chunk text cannot be empty. Empty chunk_index values: {empty_chunks}",
+                detail="No chunks with non-empty text provided",
             )
 
-        count = ingest_chunks(chunks)
+        count = ingest_chunks(ingestible_chunks)
 
         return IngestResponse(
             message="Chunks ingested successfully",

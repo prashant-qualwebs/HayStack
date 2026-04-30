@@ -3,9 +3,10 @@ from pydantic import BaseModel
 
 class IngestChunk(BaseModel):
     document_id: str
-    chunk_id: int
-    chunk_index: int
-    text: str
+    user_id: str
+    tag: str | None = None
+    order: int
+    text: str | None = None
 
 
 class IngestResponse(BaseModel):

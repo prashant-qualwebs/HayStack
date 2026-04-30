@@ -6,6 +6,7 @@ from pydantic import BaseModel
 class QueryRequest(BaseModel):
     query: str
     document_id: str | None = None
+    user_id: str
 
 
 class RetrievedDocument(BaseModel):
